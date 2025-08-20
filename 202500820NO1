@@ -1,0 +1,21 @@
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func main() {
+	t := new(T)
+	t.name = "刘德华"
+	t.value = 100
+	fmt.Println(os.Args)
+	fmt.Println(t.name, t.value)
+	fmt.Println(t.name + "    " + fmt.Sprint(t.value))
+	fmt.Println("Hello, Go!")
+}
+
+type T struct {
+	name  string // name of the object
+	value int    // its value
+}
