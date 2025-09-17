@@ -1,0 +1,75 @@
+示例二
+package main
+
+import (
+	"fmt"
+)
+
+func main() {
+	fmt.Println("Hello, Go!")
+	//var a A
+	a := A{Name: "张三", Age: 30}
+	fmt.Println(a)
+
+	x := 2
+	y := 2
+	var c = x<<8 + y<<16
+	fmt.Println(c)
+	fmt.Print(c)
+	fmt.Print("\n")
+	fmt.Printf("%X", c)
+}
+
+/*
+*
+  - %v 通用占位符，自动选择默认格式（适用于任意类型）。
+    %s 字符串（用于 string 或 []byte）。
+    %f 浮点（默认小数形式）。
+    %x / %X 十六进制。
+    %t 布尔。
+    %T 打印值的类型（调试时很有用）。
+    添加宽度/精度：%6d（宽度 6，右对齐），%08d（宽度 8，前导零）。
+*/
+
+type A struct {
+	Name string
+	Age  int
+}
+
+示例三
+package main
+
+import (
+	"bytes"
+	"fmt"
+)
+
+func main() {
+	var buf bytes.Buffer
+	buf.WriteString("hello ")
+	//这里的[]byte("world") 跟java中的强制转换类型一样
+	buf.Write([]byte("world"))
+	buf.WriteString(", ")
+	buf.WriteString("bytes.Buffer!")
+
+	b := buf.Bytes()
+	fmt.Println("Raw bytes:", b)
+	fmt.Println("As string:", buf.String())
+
+	if bytes.Contains(b, []byte("bytes")) {
+		fmt.Println("Found 'bytes' inside buffer")
+	} else {
+		fmt.Println("'bytes' not found")
+	}
+
+	replaced := bytes.Replace(b, []byte("bytes.Buffer"), []byte("bytes.Buffer (modified)"), 1)
+
+	buf.Reset()
+	fmt.Println(buf.String()) // Should be empty now
+	fmt.Print("replaced: ")
+	buf.Write(replaced)
+	fmt.Println()
+	fmt.Println("Buffer now:", buf.String())
+
+}
+
