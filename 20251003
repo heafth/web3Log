@@ -1,0 +1,127 @@
+定义：允许函数 / 类型在定义时使用类型形参（如 T），调用时指定具体类型，实现一套逻辑适配多种类型。
+核心要素：
+类型形参：函数 / 类型中声明的 “类型变量”（如 func F[T any]() 中的 T）
+类型约束：限制类型形参范围（如 int | string 或接口定义的类型集）
+类型实参：调用时传入的具体类型（如 F[int]() 中的 int）
+基础用法：
+泛型函数：func 名[T 约束](参数 T) T
+泛型类型：type 名[T 约束] 结构/接口
+泛型接口：接口可包含类型集（如 interface{ int | string }）
+关键约束：
+any：任意类型（等同于 interface{}）
+comparable：支持 ==/!= 比较的类型
+自定义类型集：通过接口组合多种类型（如 interface{ ~int | ~string }，~ 表示包含该类型的衍生类型）
+特性：
+编译期类型检查，保证类型安全
+避免重复代码，提升复用性
+不支持运行时类型参数变更（编译期确定具体类型）
+
+-------------------------------------------------------------------------
+
+package main
+
+import "fmt"
+
+/* 泛型示例 */
+type Number interface {
+	int | int8 | int16 | int32 | int64 | uint | uint8 | uint16 | uint32 | uint64
+}
+
+func add[T int | uint](a, b T) T {
+	return a + b
+}
+
+func sub[T Number, K string](a T, b K) (T, K) {
+	a = a * a
+	b += "aaa"
+	return a, b
+}
+
+func main() {
+	var a uint = 10
+	var b = uint(20)
+	fmt.Println(add(a, b))
+
+	c, d := sub(5, "bbb")
+	fmt.Println(c, d)
+}
+
+-------------------------------------------------------------------------
+//此示例演示了使用泛型结构体可以打印出原结构体中其他结构体的结构也可以用.出其变量
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+/* 泛型结构体示例 */
+
+// 非泛型
+type ResponseAny struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data any    `json:data`
+}
+
+// 泛型
+type ResponseT[T any] struct {
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data T      `json:data`
+}
+
+func main() {
+	//非泛型示例
+	type user struct {
+		ID   int    `json:id`
+		Name string `json:"name"`
+	}
+
+	userRes := ResponseAny{
+		Code: 0,
+		Msg:  "success",
+		Data: user{
+			ID:   10001,
+			Name: "得意",
+		},
+	}
+
+	bytejsonUser, _ := json.Marshal(userRes)
+	fmt.Println("json格式数据", string(bytejsonUser))
+
+	bytestr1 := fmt.Sprint(string(bytejsonUser))
+	var responseAny ResponseAny
+	//反序列化
+	json.Unmarshal([]byte(bytestr1), &responseAny)
+	//此处打印的原user信息显示变成了一个map无法用 . 出结构体成员变量
+	fmt.Println(responseAny)
+
+	//泛型示例
+	type userinfo struct {
+		ID   int    `json:id`
+		Name string `json:"name"`
+		Age  int    `json:"age"`
+	}
+
+	userinfoRes := ResponseT[userinfo]{
+		Code: 0,
+		Msg:  "success",
+		Data: userinfo{
+			ID:   10001,
+			Name: "得意",
+			Age:  100,
+		},
+	}
+
+	bytejsonuserinfo, _ := json.Marshal(userinfoRes)
+	fmt.Println("json格式数据", string(bytejsonuserinfo))
+
+	bytestr2 := fmt.Sprint(string(bytejsonuserinfo))
+	var responseT ResponseT[userinfo]
+	//反序列化
+	json.Unmarshal([]byte(bytestr2), &responseT)
+	fmt.Println(responseT)
+	//泛型结构体可以打印出原结构体成员变量
+	fmt.Println(responseT.Data.Age)
+}
