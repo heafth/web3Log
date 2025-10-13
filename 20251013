@@ -1,0 +1,29 @@
+select 不存在任何的 case；
+  直接阻塞：直接阻塞当前 Goroutine，导致 Goroutine 进入无法被唤醒的永久休眠状态。
+select 只存在一个 case；
+  单一管道： 那么编译器会将 select 改写成 if 条件语句，如果 case 中的 Channel 是空指针时，会直接挂起当前 Goroutine 并陷入永久休眠
+select 存在两个 case，其中一个 case 是 default；
+ 非阻塞操作：发送 runtime.selectnbsend 
+            接收 两个用于非阻塞接收消息的函数  runtime.selectnbrecv 会直接忽略返回的布尔值，而 runtime.selectnbrecv2 会将布尔值回传给调用方
+select 存在多个 case；
+  常见流程:
+    1、将所有的 case 转换成包含 Channel 以及类型等信息的 runtime.scase 结构体；
+    2、调用运行时函数 runtime.selectgo 从多个准备就绪的 Channel 中选择一个可执行的 runtime.scase 结构体；
+    3、通过 for 循环生成一组 if 语句，在语句中判断自己是不是被选中的 case；
+
+runtime.selectgo:
+ 1、执行一些必要的初始化操作并确定 case 的处理顺序；
+ 2、在循环中根据 case 的类型做出不同的处理；
+ 初始化：首先会进行执行必要的初始化操作并决定处理 case 的两个顺序 — 轮询顺序 pollOrder 和加锁顺序 lockOrder
+  随机的轮询顺序可以避免 Channel 的饥饿问题，保证公平性；
+  而根据 Channel 的地址顺序确定加锁顺序能够避免死锁的发生。
+
+从一个关闭 Channel 中接收数据会直接清除 Channel 中的相关内容；
+向一个关闭的 Channel 发送数据就会直接 panic 造成程序崩溃：
+
+
+1、随机生成一个遍历的轮询顺序 pollOrder 并根据 Channel 地址生成锁定顺序 lockOrder；
+2、根据 pollOrder 遍历所有的 case 查看是否有可以立刻处理的 Channel；
+   2.1、如果存在，直接获取 case 对应的索引并返回；
+   2.2、如果不存在，创建 runtime.sudog 结构体，将当前 Goroutine 加入到所有相关 Channel 的收发队列，并调用 runtime.gopark 挂起当前 Goroutine 等待调度器的唤醒；
+3、当调度器唤醒当前 Goroutine 时，会再次按照 lockOrder 遍历所有的 case，从中查找需要被处理的 runtime.sudog 对应的索引；
