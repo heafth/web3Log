@@ -22,6 +22,8 @@ WithValue         ✅ 是                  ❌          不可取消创建携带
    基础原语 sync.Mutex、sync.RWMutex、sync.WaitGroup、sync.Once 和 sync.Cond
    扩展原语 golang/sync/errgroup.Group、golang/sync/semaphore.Weighted 和 golang/sync/singleflight.Group
 
+
+Mutex:
 state 字段解释：
   |31......3|2|1|0|
   | waiters |S|W|L|
@@ -73,6 +75,8 @@ Go 的互斥锁是这样干活的：
   如果该函数返回的新状态等于 0，当前 Goroutine 就成功解锁了互斥锁；
   如果该函数返回的新状态不等于 0，这段代码会调用 sync.Mutex.unlockSlow 开始慢速解锁
 
+
+RWMutex:
 写锁：除了给写上锁，还需要给阻塞后续的读操作 并等到 正在读的人操作完
  | 步骤 | 代码                                                     | 说明                |
  | --   | ------------------------------------------------------  | ---------------     |
@@ -96,4 +100,21 @@ r := atomic.AddInt32(&rw.readerCount, -rwmutexMaxReaders) + rwmutexMaxReaders
   如果返回值大于等于零 — 读锁直接解锁成功；
   如果返回值小于零 — 有一个正在执行的写操作，在这时会调用sync.RWMutex.rUnlockSlow 方法；
 
+WaitGroup：
+ 关于sync.noCopy：
+  yawg := wg 的确是拷贝，但 Go 编译器不会报错
+  noCopy 的作用是 让 go vet 检查工具提示警告
+  建议：WaitGroup 永远用指针传递，避免拷贝
 
+ sync.WaitGroup 对外暴露了三个方法 (其中的 sync.WaitGroup.Done 只是向 sync.WaitGroup.Add 方法传入了 -1)
+  sync.WaitGroup.Add
+  sync.WaitGroup.Wait
+  sync.WaitGroup.Done 
+
+Once
+  Go 语言标准库中 sync.Once 可以保证在 Go 程序运行期间的某段代码只会执行一次。在运行如下所示的代码时，我们会看到如下所示的运行结果：
+  两次调用 sync.Once.Do 方法传入不同的函数只会执行第一次调传入的函数 即： 每个 sync.Once 实例只保证它第一次 Do() 调用执行
+  如果还有需要执行一次的需求 则需要添加 一个新的sync.Once 实例 比如 var once2 sync.Once
+
+Cond
+  Go 语言标准库中还包含条件变量 sync.Cond，它可以让一组的 Goroutine 都在满足特定条件时被唤醒。
