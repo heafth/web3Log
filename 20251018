@@ -1,0 +1,99 @@
+父context 和 子context 到底是谁先关闭 谁通知谁
+两种：
+1、标准    父主动通知父遍历    children，直接调用 child.cancel()
+2、自定义  外部监听器独立      context.propagateCancel 同时监听 parent.Done() 和 child.Done()
+
+
+Done() 返回值的区别
+  | **nil**          | 永不取消 |       从 nil channel 读取永远阻塞    |   `Background`, `TODO`      |
+  | **非空 channel** | 可以取消 | 取消时 `close(channel)`，读取立即返回 | `WithCancel`, `WithTimeout` |
+
+函数             创建子 context          可取消               作用
+WithCancel        ✅ 是                  ✅          可取消创建可取消的子 context
+WithTimeout       ✅ 是                  ✅          可取消创建带超时的子 context
+WithDeadline      ✅ 是                  ✅          可取消创建带截止时间的子 context
+WithValue         ✅ 是                  ❌          不可取消创建携带数据的子 context
+
+---------------------------------------------------------------------------------------------------------------
+
+同步原语（Synchronization Primitives）
+   它能保证多个 Goroutine 在访问同一片内存时不会出现竞争条件（Race condition）等问题
+ 包括：
+   基础原语 sync.Mutex、sync.RWMutex、sync.WaitGroup、sync.Once 和 sync.Cond
+   扩展原语 golang/sync/errgroup.Group、golang/sync/semaphore.Weighted 和 golang/sync/singleflight.Group
+
+state 字段解释：
+  |31......3|2|1|0|
+  | waiters |S|W|L|
+  mutexLocked — 表示互斥锁的锁定状态；
+  mutexWoken — 表示从正常模式被从唤醒；
+  mutexStarving — 当前的互斥锁进入饥饿状态；
+  waitersCount — 当前互斥锁上等待的 Goroutine 个数；
+
+
+正常模式：
+  默认互斥锁的工作模式。
+  新 goroutine 获取锁时，会先 尝试自旋（spin） 抢锁，而不是直接阻塞。
+  这种自旋可以减少 goroutine 频繁挂起和唤醒的开销，适合锁被占用时间很短的情况。
+   goroutine A 持有锁
+   goroutine B 来抢锁
+     ├─ 尝试自旋几次
+     ├─ 自旋失败 → 挂起等待
+
+饥饿模式：
+  触发条件：
+    当某个 goroutine 等待锁的时间超过 一定阈值（约 1ms），
+    或者锁一直被占用且大量 goroutine 排队等待时。
+  特点：
+    锁进入 饥饿模式后，新的 goroutine 不再尝试自旋，而是直接加入队列等待锁释放。
+    队列中的 goroutine 会 严格按 FIFO 顺序获取锁，保证公平性。
+    适合锁被长时间占用或竞争激烈的场景。
+     goroutine A 持有锁
+     goroutine B 挂起等待
+     goroutine C 挂起等待
+     goroutine D 来了 → 直接排队，不自旋
+    释放锁 → FIFO 顺序唤醒 B → 再唤醒 C → 再唤醒 D
+
+Go 的自旋逻辑是经过优化的：
+ 只有在 正常模式（Normal mode） 下才会自旋；
+ 自旋次数有上限（最多 4 次左右）；
+ 自旋只在多核 CPU 下才会启用；
+ 自旋期间如果发现锁释放，就立即竞争；
+ 如果锁一直没释放，就进入“阻塞等待队列”（挂起）
+
+
+Go 的互斥锁是这样干活的：
+ 大家先用 CAS 去抢；
+ 抢不到的就去排队（信号量机制）也就是等待别人“放锁”；
+ 锁释放时唤醒下一个；
+ 如果有人饿太久，进入“饥饿模式”保证公平；
+ 解锁分“快路径”和“慢路径”，快的直接结束，慢的负责唤醒别人。
+
+解锁过程：
+  如果该函数返回的新状态等于 0，当前 Goroutine 就成功解锁了互斥锁；
+  如果该函数返回的新状态不等于 0，这段代码会调用 sync.Mutex.unlockSlow 开始慢速解锁
+
+写锁：除了给写上锁，还需要给阻塞后续的读操作 并等到 正在读的人操作完
+ | 步骤 | 代码                                                     | 说明                |
+ | --   | ------------------------------------------------------  | ---------------     |
+ | ①    | `rw.w.Lock()`                                           | 防止多个写者同时抢锁  |
+ | ②    | `atomic.AddInt32(&rw.readerCount, -rwmutexMaxReaders)`  | 阻止新的读者进入     |
+ | ③    | `if r != 0 { runtime_SemacquireMutex(...) }`            | 如果还有读者没退出，就休眠等待 |
+ | ④    | 等读者都释放后被唤醒，进入写锁状态 ✅                     |                    |
+
+其中有段代码解读：
+r := atomic.AddInt32(&rw.readerCount, -rwmutexMaxReaders) + rwmutexMaxReaders
+  意思是给 readerCount 减去一个大数（rwmutexMaxReaders，通常是 1<<30），
+  这是 RWMutex 内部用的一种“标记位技巧”：
+    高位（这个大数）表示“写者正在等锁”，
+    低位表示实际读者数量。
++ rwmutexMaxReaders
+  把低位的读者数量算出来，存到 r 里
+
+读锁
+  读锁的加锁方法 sync.RWMutex.RLock 很简单，该方法会通过 sync/atomic.AddInt32 将 readerCount 加一：
+
+  如果返回值大于等于零 — 读锁直接解锁成功；
+  如果返回值小于零 — 有一个正在执行的写操作，在这时会调用sync.RWMutex.rUnlockSlow 方法；
+
+
