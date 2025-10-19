@@ -54,5 +54,8 @@ timerRemoving      <-- 正在从堆中物理移除
     ▼
 timerRemoved       <-- 已从堆中移除完成，可以 Reset
 
-
+Channel：
+  Go 的 Channel 虽然看起来像无锁通信，但底层其实是加锁实现的。
+  社区尝试过用 CAS 做“无锁 Channel”，
+  但目前还达不到理想的 FIFO 性能效果，所以还没有正式采用。
  
