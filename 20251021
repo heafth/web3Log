@@ -1,0 +1,14 @@
+myproject/                 <- 模块名，全小写
+├─ go.mod                  <- 模块配置文件
+├─ main.go                 <- 可执行入口文件，文件名小写
+├─ utils/                  <- 包名，全小写
+│   ├─ string_utils.go     <- 文件名小写
+│   └─ math_utils.go       <- 文件名小写
+│
+├─ models/                 <- 包名，全小写
+│   ├─ person.go           <- 文件名小写
+│   └─ order.go            <- 文件名小写
+│
+└─ handlers/               <- 包名，全小写
+    ├─ user_handler.go     <- 文件名小写
+    └─ product_handler.go  <- 文件名小写
