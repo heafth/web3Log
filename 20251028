@@ -1,0 +1,5 @@
+       目标	                      正确用法                       含义	                     是否涉及 ASCII 码
+数字123 → 字符串 "123"	        strconv.Itoa(123)	             数字变字符串	                  ❌ 不涉及 ASCII
+字符串"123" → 数字 123	        strconv.Atoi("123")	           字符串变数字	                  ❌ 不涉及 ASCII
+数字65 → 'A'	                   string(65)	                 数字变成字符	                  ✅ 涉及 ASCII
+'A' → 数字 65	                    int('A')	                字符转数字编码	                  ✅ 涉及 ASCII
