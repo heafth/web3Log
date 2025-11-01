@@ -11,3 +11,83 @@ sum++ 实际上做了三步操作：
   1、读取 sum 的当前值
   2、对值 +1
   3、写回 sum
+
+gorm：
+GORM 命名规则笔记（纯文字 + 示例代码版）
+
+结构体名与数据库表名是否必须一样？
+不必须一样。GORM 会根据规则自动将结构体名转换成数据库表名。
+
+GORM 默认命名规则
+
+Go 结构体：单数，大写开头（例：User）
+
+数据库表名：复数，小写，下划线格式（例：users）
+示例：
+结构体 User 默认对应数据库表 users
+字段 Name 会转换为 name
+
+示例代码（默认规则）：
+type User struct {
+ID uint
+Name string
+}
+// 默认生成表名：users
+
+推荐命名规范（最佳实践）
+
+结构体名：单数，大写（如：User, Product）
+
+数据库表名：复数，小写（如：users, products）
+原因：结构体表示单个对象；表中存储的是对象集合。
+
+如何让结构体名与表名保持一致
+如果希望 User 对应 User 表，有三种方式：
+
+方法一：使用 TableName() 指定表名（最常用）
+示例：
+type User struct {
+ID uint
+Name string
+}
+func (User) TableName() string {
+return "User"
+}
+结果：结构体 User 对应表名 User（大小写一致）
+
+方法二：禁用复数表名（但仍会变成小写）
+示例：
+db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{
+NamingStrategy: schema.NamingStrategy{
+SingularTable: true,
+},
+})
+// 结果：User → user
+
+方法三：关闭小写转换（较少使用）
+示例：
+db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{
+NamingStrategy: schema.NamingStrategy{
+NoLowerCase: true,
+},
+})
+// 结果：User → User（保持大写）
+
+命名误区（避免）
+
+不要将结构体命名为 Users（复数），结构体代表单个对象
+
+不需要强制让结构体名与表名一致
+
+User 和 Users 作为结构体名，最终 GORM 都会变成 users 表，写 Users 没意义
+
+总结
+想要默认效果：User → users（无需配置）
+想用单数表名：User → user（禁用复数表名）
+想完全一致：User → User（使用 TableName 方法）
+想自定义表名：使用 TableName 可自由命名任何表名
+
+示例（自定义任意表名）：
+func (User) TableName() string {
+return "tbl_user"
+}
