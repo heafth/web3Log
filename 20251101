@@ -88,8 +88,3 @@ User 和 Users 作为结构体名，最终 GORM 都会变成 users 表，写 Use
 想用单数表名：User → user（禁用复数表名）
 想完全一致：User → User（使用 TableName 方法）
 想自定义表名：使用 TableName 可自由命名任何表名
-
-示例（自定义任意表名）：
-func (User) TableName() string {
-return "tbl_user"
-}
