@@ -66,7 +66,7 @@ SingularTable: true,
 })
 // 结果：User → user
 
-方法三：关闭小写转换（较少使用）
+方法三：关闭小写转换并无下划线（较少使用）
 示例：
 db, _ := gorm.Open(mysql.Open(dsn), &gorm.Config{
 NamingStrategy: schema.NamingStrategy{
